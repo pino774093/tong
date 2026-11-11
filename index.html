@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--top)}
-body{font-family:var(--cond);color:var(--white);background:linear-gradient(180deg,var(--top) 0%,#7FB3A2 45%,var(--bot) 100%) fixed;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{font-family:var(--cond);color:var(--white);background:var(--top);overflow-x:hidden;-webkit-font-smoothing:antialiased}
 body.loading{overflow:hidden}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -31,6 +31,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #cur.on{opacity:1}
 @media (hover:hover) and (pointer:fine){ html,body,*{cursor:none!important} }
 @media (hover:none),(pointer:coarse){ #cur{display:none} }
+#bgfix{position:fixed;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,var(--top) 0%,#7FB3A2 45%,var(--bot) 100%)}
 #gl{position:fixed;inset:0;width:100vw;height:100vh;z-index:1;pointer-events:none;display:block}
 .z2{position:relative;z-index:2}
 .z3{position:relative;z-index:3}
@@ -257,6 +258,7 @@ footer img{height:clamp(30px,3vw,48px)}
 </head>
 <body class="loading">
 <div id="loader"><div class="count" id="ldCount">000</div></div>
+<div id="bgfix"></div>
 <canvas id="gl"></canvas>
 <div id="cur"></div>
 <nav class="nav" id="nav"><a href="#system" data-page="system">SYSTEM</a><a href="#create" data-page="create">CREATE</a><a href="#archive" data-page="archive">ARCHIVE</a></nav>
@@ -485,11 +487,7 @@ const MAT_CACHE=new Map();
 function makeMat(hex){
   if (MAT_CACHE.has(hex)) return MAT_CACHE.get(hex);
   const c=new THREE.Color(hex);
-  const m=new THREE.MeshPhysicalMaterial({
-    color:c, roughness:0.58, metalness:0, clearcoat:0.08, clearcoatRoughness:0.6,
-    sheen:0.35, sheenRoughness:0.6, sheenColor:new THREE.Color('#ffffff').lerp(c,0.5),
-    emissive:c.clone().multiplyScalar(0.05)
-  });
+  const m=new THREE.MeshStandardMaterial({ color:c, roughness:0.55, metalness:0, emissive:c.clone().multiplyScalar(0.05) });
   m.userData.cached=true; MAT_CACHE.set(hex,m); return m;
 }
 const EYE_MAT = new THREE.MeshPhysicalMaterial({ color:0x0c0b0d, roughness:0.1, clearcoat:1, clearcoatRoughness:0.04 });
@@ -521,7 +519,7 @@ const PRESETS = {
   komi: { shape:'hex', faceLen:2.1, faceThick:0.3, faceRound:1, limbLen:4.2, limbThick:0.2, limbRound:1, wiggle:0.85, bodySoft:0.25, eyeSize:0.085, eyeSpread:0.08, palette:'komi', body:'#BDB7D6', face:'#F2CB55', seed:5 },
 };
 const MOODS = {
-  basic:{ w:1.3, sway:0.28, curl:0, sx:1, sy:1, hop:false },
+  basic:{ w:0.9, sway:0.15, curl:0, sx:1, sy:1, hop:false },
   happy:{ w:4.2, sway:0.7, curl:0, sx:1, sy:1, hop:true },
   lazy: { w:0.35, sway:0.08, curl:0, sx:1.16, sy:0.72, hop:false },
   shy:  { w:0.8, sway:0.15, curl:3.2, sx:0.94, sy:0.94, hop:false },
@@ -604,7 +602,7 @@ class Creature{
     this.fit();
   }
   highlight(p){ this.hlPart=p; this.hlTime=1.4; }
-  setStage(s){ if (s===this.stage) return; this.stage=s; this.poke(1.6); }
+  setStage(s){ if (s===this.stage) return; this.stage=s; this.poke(0.9); }
   layout(stage){
     const p=this.p, R=this.rule, k=R.clones, m=this.m;
     const L=Math.max(p.faceLen,p.limbLen), sp=Math.max(p.faceThick,p.limbThick)+0.28;
@@ -710,7 +708,7 @@ class Creature{
     this.applyLayout(false, dt);
     this.deform(this.time);
     // hop
-    if (target.hop && this.hopT<0 && this.time>this.nextAutoHop){ this.hop(); this.nextAutoHop=this.time+0.25+Math.random()*0.5; }
+    if (target.hop && this.hopT<0 && this.time>this.nextAutoHop){ this.hop(); this.nextAutoHop=this.time+0.9+Math.random()*0.7; }
     let y=0, squash=0;
     if (this.hopT>=0){
       this.hopT += dt/0.62;
@@ -720,7 +718,7 @@ class Creature{
       else if (u<1) squash = Math.sin((u-0.85)/0.15*Math.PI)*0.12;
       else this.hopT=-1;
     }
-    { const acc=-260*this.jx-9*this.jv; this.jv+=acc*dt; this.jx+=this.jv*dt; this.jx=clamp(this.jx,-0.35,0.35); }
+    { const acc=-260*this.jx-12*this.jv; this.jv+=acc*dt; this.jx+=this.jv*dt; this.jx=clamp(this.jx,-0.35,0.35); }
     const br=Math.sin(this.time*2.1)*0.016 + this.jx;
     this.mover.position.y=y;
     this.mover.scale.set(md.sx*(1+squash*0.6-br*0.5), md.sy*(1-squash+br), md.sx*(1+squash*0.6-br*0.5));
@@ -744,7 +742,7 @@ function setupScene(r){
   return sc;
 }
 const renderer=new THREE.WebGLRenderer({canvas:$('#gl'),antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
 const scene=setupScene(renderer);
 const camera=new THREE.PerspectiveCamera(26,1,0.1,200); camera.position.set(0,0,10);
 let VW=1,VH=1,WV=1,HV=1,MOBILE=false;
@@ -802,7 +800,7 @@ const heroCreatures=$$('[data-c]').map(cell=>{
   const wrap=new THREE.Group(); wrap.add(c.holder); scene.add(wrap);
   c.mover.rotation.set(k==='tong'?0.12:0.25, k==='orange'?-0.9:k==='pink'?-0.5:-0.55, 0);
   const fill={tong:1.0}[k]||1;
-  cell.addEventListener('click',()=>{ c.hop(); c.poke(1.6); });
+  cell.addEventListener('click',()=>{ c.hop(); c.poke(1.0); });
   return {k,c,wrap,cell,fill,base:c.mover.rotation.y, t:Math.random()*10};
 });
 let bubbleT=0, bubbleCell=null;
@@ -818,7 +816,7 @@ addEventListener('pointerdown',()=>{ cursor.ts*=0.75; });
 addEventListener('pointerup',e=>{ cursor.ts = (e.target.closest&&e.target.closest(HOVER_SEL))?1.5:1; });
 document.addEventListener('pointerleave',()=>cursor.el.classList.remove('on'));
 /* ---- inertial smooth scroll ---- */
-let over=0; const OVER_MAX=520;
+let over=0, overShown=-1; const OVER_MAX=520;
 const SS={y:scrollY,t:scrollY,active:false,touch:matchMedia('(hover:none),(pointer:coarse)').matches};
 const maxScroll=()=>document.documentElement.scrollHeight-innerHeight;
 function scrollToY(y){ SS.t=clamp(y,0,maxScroll()); if (SS.touch) scrollTo({top:SS.t,behavior:'smooth'}); else SS.active=true; }
@@ -945,7 +943,7 @@ function springs(dt){
   let moving=false;
   const n=Math.ceil(dt/0.008), h=dt/n;
   for (let s=0;s<n;s++) for (const k of NUM){
-    const a=190*(state[k]-disp[k]) - 11*vel[k]; vel[k]+=a*h; disp[k]+=vel[k]*h;
+    const a=180*(state[k]-disp[k]) - 13*vel[k]; vel[k]+=a*h; disp[k]+=vel[k]*h;
   }
   for (const k of NUM){ if (Math.abs(state[k]-disp[k])>2e-4 || Math.abs(vel[k])>2e-3) moving=true; else { disp[k]=state[k]; vel[k]=0; } }
   return moving;
@@ -955,9 +953,9 @@ const drag={on:false,x:0,y:0,moved:0,ry:-0.3,rx:0.15,vy:0};
 const pad=$('#labPad');
 pad.addEventListener('pointerdown',e=>{ if (e.target.closest('button')) return; drag.on=true; drag.x=e.clientX; drag.y=e.clientY; drag.moved=0; pad.setPointerCapture(e.pointerId); });
 pad.addEventListener('pointermove',e=>{ if(!drag.on) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY; drag.moved+=Math.abs(dx)+Math.abs(dy); drag.vy=dx*0.008; drag.ry+=dx*0.008; drag.rx=clamp(drag.rx+dy*0.005,-0.5,0.9); });
-pad.addEventListener('pointerup',e=>{ if (drag.on && drag.moved<6) { pet.hop(); pet.poke(1.4); } else if (drag.on) setTimeout(()=>{ photo(); },350); drag.on=false; });
+pad.addEventListener('pointerup',e=>{ if (drag.on && drag.moved<6) { pet.hop(); pet.poke(1.0); } else if (drag.on) setTimeout(()=>{ photo(); },350); drag.on=false; });
 pad.addEventListener('pointercancel',()=>drag.on=false);
-$$('#moods [data-mood]').forEach(b=>b.addEventListener('click',()=>{ $$('#moods [data-mood]').forEach(x=>x.classList.toggle('on',x===b)); pet.setMood(b.dataset.mood); pet.poke(1); }));
+$$('#moods [data-mood]').forEach(b=>b.addEventListener('click',()=>{ $$('#moods [data-mood]').forEach(x=>x.classList.toggle('on',x===b)); pet.setMood(b.dataset.mood); pet.poke(0.5); }));
 
 const CONTROLS=[
   ['FACE',[['faceLen','LENGTH',1.2,3.2,0.05],['faceThick','THICKNESS',0.2,0.85,0.01],['faceRound','ROUND',0,1,0.01]]],
@@ -1000,15 +998,15 @@ $('#casTabs').addEventListener('click',e=>{ const b=e.target.closest('[data-tab]
 $('#prevStep').addEventListener('click',()=>{ const i=STEPS_C.indexOf(curTab); if(i>0) goStep(STEPS_C[i-1]); });
 $('#nextStep').addEventListener('click',()=>{ const i=STEPS_C.indexOf(curTab); if(i<STEPS_C.length-1) goStep(STEPS_C[i+1]); else { photo(); unstamp(); updateCert(); scrollToEl($('#adopt')); } });
 function ruleText(){}
-$('#standToggle').addEventListener('change',e=>{ pet.setStand(e.target.checked); certPet.setStand(e.target.checked); pet.poke(1.2); });
+$('#standToggle').addEventListener('change',e=>{ pet.setStand(e.target.checked); certPet.setStand(e.target.checked); pet.poke(0.6); });
 const paint=inp=>inp.style.setProperty('--p',((inp.value-inp.min)/(inp.max-inp.min)*100)+'%');
 $('#casPanel').addEventListener('input',e=>{ const inp=e.target,k=inp.dataset.k; if(!k) return; state[k]=parseFloat(inp.value); $('#o-'+k).textContent=(+inp.value).toFixed(2); paint(inp); });
 $('#shapeGrid').innerHTML=SH_KEYS.map(k=>`<button class="shape-btn" data-shape="${k}">${shapeIcon(k)}${SHAPES[k].label}</button>`).join('');
 $('#shapeGrid').addEventListener('click',e=>{ const b=e.target.closest('[data-shape]'); if(!b) return; loadShape(b.dataset.shape); });
-function loadShape(sh){ if (state.shape===sh) return; state.shape=sh; needBuild=true; kick(2.4); syncUI(); }
+function loadShape(sh){ if (state.shape===sh) return; state.shape=sh; needBuild=true; kick(1.3); syncUI(); }
 const PAL_KEYS=Object.keys(PALETTES);
 $('#pals').innerHTML=PAL_KEYS.map(k=>{ const P=PALETTES[k]; const bg = k==='komi' ? `conic-gradient(${P.limbs.join(',')})` : P.body; return `<button class="pal" data-pal="${k}" title="${P.name}" style="background:${bg}"></button>`; }).join('');
-$('#pals').addEventListener('click',e=>{ const b=e.target.closest('[data-pal]'); if(!b) return; const P=PALETTES[b.dataset.pal]; Object.assign(state,{palette:b.dataset.pal,body:P.body,face:P.face}); needBuild=true; kick(1.2); syncUI(); });
+$('#pals').addEventListener('click',e=>{ const b=e.target.closest('[data-pal]'); if(!b) return; const P=PALETTES[b.dataset.pal]; Object.assign(state,{palette:b.dataset.pal,body:P.body,face:P.face}); needBuild=true; kick(0.5); syncUI(); });
 function syncUI(){
   $$('#casPanel input[type=range]').forEach(inp=>{ const k=inp.dataset.k; inp.value=state[k]; $('#o-'+k).textContent=(+state[k]).toFixed(2); paint(inp); });
   $$('.shape-btn').forEach(b=>b.classList.toggle('on',b.dataset.shape===state.shape));
@@ -1018,14 +1016,14 @@ function syncUI(){
 $('#randomBtn').addEventListener('click',()=>{
   const r=(a,b)=>+(a+Math.random()*(b-a)).toFixed(2), pk=PAL_KEYS[Math.floor(Math.random()*PAL_KEYS.length)], P=PALETTES[pk], wig=Math.random()<0.3?0:r(0.15,0.9);
   Object.assign(state,{shape:SH_KEYS[Math.floor(Math.random()*SH_KEYS.length)], faceLen:r(1.4,2.4), faceThick:r(0.3,0.7), faceRound:r(0,1), limbLen:wig?r(2.4,4.5):r(1.6,2.6), limbThick:wig?r(0.14,0.32):r(0.3,0.6), limbRound:r(0,1), wiggle:wig, bodySoft:r(0.05,0.7), eyeSize:r(0.07,0.22), eyeSpread:r(0.06,0.22), palette:pk, body:P.body, face:P.face, seed:Math.floor(Math.random()*9999)});
-  needBuild=true; kick(2.4); syncUI(); goStep('finish');
+  needBuild=true; kick(1.3); syncUI(); goStep('finish');
 });
 
 /* ============ LIVE CERT CREATURE ============ */
 const certWrap=new THREE.Group(); scene.add(certWrap);
 const certPet=new Creature(built(),{stand:pet.stand}); certPet.shadow.visible=false; certWrap.add(certPet.holder);
 const certEl=$('.cert-photo');
-certEl.addEventListener('click',()=>{ certPet.hop(); certPet.poke(1.4); }); certEl.style.cursor='pointer';
+certEl.addEventListener('click',()=>{ certPet.hop(); certPet.poke(1.0); }); certEl.style.cursor='pointer';
 
 /* ============ SNAPSHOT / ADOPT ============ */
 let snap=null;
@@ -1138,11 +1136,12 @@ $('#adoptForm').addEventListener('submit',async e=>{
 const vis=el=>{ const r=el.getBoundingClientRect(); return clamp((Math.min(r.bottom,VH)-Math.max(r.top,0))/VH,0,1); };
 const W={sys:0,lab:0}; let sysScale=1, labScale=1; const labAnc={x:0,y:0.5};
 const secSys=$('#sys'), secLab=$('#lab'), secAdopt=$('#adopt');
+const DOM={tcBar:$('#tcBar'), ticks:$$('#ticks b'), pin:$('.pin'), arcModal:$('#arcModal'), tickKey:''};
 let last=performance.now();
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now; const t=now/1000;
   scrollTick(dt);
-  over*=Math.exp(-dt*1.6); $('#tcBar').style.transform=`scaleX(${Math.min(1,over/OVER_MAX)})`;
+  over*=Math.exp(-dt*1.6); { const v=Math.round(Math.min(1,over/OVER_MAX)*200)/200; if (v!==overShown){ overShown=v; DOM.tcBar.style.transform=`scaleX(${v})`; } }
   mouse.x=lerp(mouse.x,mouse.tx,1-Math.exp(-dt*4)); mouse.y=lerp(mouse.y,mouse.ty,1-Math.exp(-dt*4));
   cursor.x=lerp(cursor.x,cursor.tx,1-Math.exp(-dt*20)); cursor.y=lerp(cursor.y,cursor.ty,1-Math.exp(-dt*20));
   cursor.s=lerp(cursor.s,cursor.ts,1-Math.exp(-dt*12));
@@ -1156,9 +1155,8 @@ function loop(now){
     const s=h.c.size, cellH=px(r.height), sc=cellH*h.fill/Math.max(s.x,s.y,s.z);
     h.wrap.scale.setScalar(sc);
     h.wrap.position.set(sx(r.left+r.width/2), sy(r.top+r.height/2)-s.y*sc/2, 0);
-    h.c.mover.rotation.y=lerp(h.c.mover.rotation.y, h.base+Math.sin(t*0.4+h.t)*0.35+mouse.x*0.35, 1-Math.exp(-dt*3));
+    h.c.mover.rotation.y=lerp(h.c.mover.rotation.y, h.base+Math.sin(t*0.3+h.t)*0.12+mouse.x*0.22, 1-Math.exp(-dt*3));
     h.c.mover.rotation.x=lerp(h.c.mover.rotation.x, (h.k==='tong'?0.12:0.25)+mouse.y*0.2, 1-Math.exp(-dt*3));
-    if (Math.random()<dt*0.12) h.c.hop();
   }
 
   // system
@@ -1168,8 +1166,8 @@ function loop(now){
   W.lab=lerp(W.lab, smooth(clamp(vLab*1.6-0.2,0,1))*(1-vis(secAdopt)), k);
   { const r=secSys.getBoundingClientRect(), p=clamp(-r.top/(r.height-VH),0,0.9999), step=Math.floor(p*6);
     if (vSys>0) setSysStep(step); const loc=p*6-step;
-    $$('#ticks b').forEach((b,i)=>b.style.transform=`scaleX(${i<step?1:i===step?loc:0})`); }
-  const pinR=$('.pin').getBoundingClientRect();
+    const key=step+':'+Math.round(loc*60); if (key!==DOM.tickKey){ DOM.tickKey=key; DOM.ticks.forEach((b,i)=>b.style.transform=`scaleX(${i<step?1:i===step?loc:0})`); } }
+  const pinR=DOM.pin.getBoundingClientRect();
   sysWrap.visible=pinR.bottom>0 && pinR.top<VH;
   if (sysWrap.visible){
     const kk=1-Math.exp(-dt*6);
@@ -1179,7 +1177,7 @@ function loop(now){
     sysScale=lerp(sysScale,fit,kk*0.7);
     sysWrap.scale.setScalar(Math.max(1e-4,sysScale));
     sysWrap.position.set(MOBILE?0:0.19*WV, sy(pinR.top+pinR.height/2)+(MOBILE?0.16*HV:0.02*HV), 0);
-    sysGroup.rotation.set(0.32,(sysStep>=4?-0.55+Math.sin(t*0.5)*0.6:-0.3+Math.sin(t*0.6)*0.18),0);
+    sysGroup.rotation.set(0.32,(sysStep>=4?-0.55+Math.sin(t*0.3)*0.25:-0.3+Math.sin(t*0.3)*0.08),0);
   }
 
   // lab with jelly springs
@@ -1210,15 +1208,15 @@ function loop(now){
     o.wrap.visible=on; if(!on) continue;
     o.c.update(dt);
     const s=o.c.size, sc=0.66*px(r.height)/Math.max(s.x,s.y,s.z), br=Math.sin(t*1.9+o.ph);
-    o.wrap.scale.set(sc*(1-br*0.018), sc*(1+br*0.035), sc*(1-br*0.018));
+    o.wrap.scale.set(sc*(1-br*0.008), sc*(1+br*0.016), sc*(1-br*0.008));
     o.wrap.position.set(sx(r.left+r.width/2), sy(r.top+r.height*0.47)-s.y*sc/2, 0);
-    o.c.mover.rotation.y=(o.a.ry??-0.55)+Math.sin(t*0.45+o.ph)*0.3;
+    o.c.mover.rotation.y=(o.a.ry??-0.55)+Math.sin(t*0.3+o.ph)*0.12;
   }
-  if (am && am.c && $('#arcModal').classList.contains('on')){
+  if (am && am.c && DOM.arcModal.classList.contains('on')){
     const cv=$('#amCanvas'), w=cv.clientWidth, h=cv.clientHeight;
     if (w && (cv.width!==Math.round(w*am.r.getPixelRatio()))){ am.r.setSize(w,h,false); am.cam.aspect=w/h; am.cam.updateProjectionMatrix(); }
-    am.c.update(dt); const br=Math.sin(t*1.9); am.c.holder.scale.set(1-br*0.018,1+br*0.035,1-br*0.018);
-    am.c.mover.rotation.y=am.base+Math.sin(t*0.45)*0.35;
+    am.c.update(dt); const br=Math.sin(t*1.9); am.c.holder.scale.set(1-br*0.008,1+br*0.016,1-br*0.008);
+    am.c.mover.rotation.y=am.base+Math.sin(t*0.3)*0.12;
     am.r.render(am.scene,am.cam);
   }
   // live cert creature (breathing)
@@ -1227,9 +1225,9 @@ function loop(now){
       certPet.update(dt);
       const s=certPet.size, sc=0.72*px(r.height)/Math.max(s.x,s.y,s.z);
       const br=Math.sin(t*1.9);
-      certWrap.scale.set(sc*(1-br*0.018), sc*(1+br*0.035), sc*(1-br*0.018));
+      certWrap.scale.set(sc*(1-br*0.008), sc*(1+br*0.016), sc*(1-br*0.008));
       certWrap.position.set(sx(r.left+r.width/2), sy(r.top+r.height/2)-s.y*sc/2, 0);
-      certPet.mover.rotation.y=drag.ry+Math.sin(t*0.45)*0.35;
+      certPet.mover.rotation.y=drag.ry+Math.sin(t*0.3)*0.12;
       certPet.mover.rotation.x=clamp(drag.rx,-0.2,0.6);
     } }
   // nav
