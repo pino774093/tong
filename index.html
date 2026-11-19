@@ -238,8 +238,9 @@ body.sliding{overflow-x:hidden}
 #parkPage{position:relative;height:100vh;height:100svh;overflow:hidden;touch-action:none;user-select:none}
 .park-title{position:absolute;left:4.4vw;top:3.2vh;font-family:var(--big);font-weight:900;font-size:clamp(48px,6vw,104px);line-height:.95;pointer-events:none}
 .park-count{position:absolute;left:4.4vw;top:calc(3.2vh + clamp(50px,6.4vw,110px));font-weight:600;font-size:15px;letter-spacing:.08em;opacity:.85}
-.park-keys{position:absolute;left:50%;bottom:3.2vh;transform:translateX(-50%);display:flex;gap:18px;font-family:var(--kr);font-size:13px;white-space:nowrap}
-.park-keys b{font-family:var(--cond);font-weight:700;background:var(--white);color:var(--ink);padding:3px 8px;margin-right:6px;letter-spacing:.06em}
+.park-keys{position:absolute;right:4.4vw;bottom:4vh;display:grid;grid-template-columns:auto auto;grid-template-rows:repeat(3,auto);grid-auto-flow:column;gap:10px 22px;padding:14px 18px;background:rgba(20,40,40,.16);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-family:var(--kr);font-size:13px;white-space:nowrap}
+.park-keys span{display:flex;align-items:center}
+.park-keys b{font-family:var(--cond);font-weight:700;background:var(--white);color:var(--ink);padding:3px 8px;margin-right:6px;letter-spacing:.06em;min-width:24px;text-align:center}
 #joy{position:absolute;left:6vw;bottom:5vh;width:120px;height:120px;border-radius:50%;border:2px solid rgba(255,255,255,.8);background:rgba(255,255,255,.15);display:none;touch-action:none}
 #joy i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--white)}
 #jumpBtn{position:absolute;right:6vw;bottom:6vh;width:90px;height:90px;border-radius:50%;background:var(--white);color:var(--ink);font-family:var(--cond);font-weight:700;font-size:18px;display:none}
@@ -273,6 +274,7 @@ body.pwarp::after{opacity:1;transition:opacity .55s ease-in}
 .ptag{position:absolute;left:0;top:0;background:var(--white);color:var(--ink);font-family:var(--kr);font-weight:600;font-size:13px;padding:3px 9px;white-space:nowrap;opacity:0;transition:opacity .25s}
 .ptag.on{opacity:1}
 .ptag.me{background:var(--ink);color:var(--white)}
+.ptag.net::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#2FBF71;margin-right:6px;vertical-align:1px}
 /* qr + pet page */
 .qrbox[hidden]{display:none!important}
 .qrbox{display:flex;align-items:center;gap:14px;margin-top:6px;padding-top:12px;border-top:1.5px solid var(--ink)}
@@ -456,7 +458,7 @@ footer img{height:clamp(30px,3vw,48px)}
 <section id="parkPage" class="z2">
   <div class="park-title">PARK</div>
   <div class="park-count" id="parkCount"></div>
-  <div class="park-keys"><span><b>W A S D</b> 이동</span><span><b>SPACE</b> 점프</span><span><b>E</b> 인사</span><span><b>Q</b> 부비부비</span><span><b>F</b> 벤치 앉기</span><span><b>클릭</b> 그곳으로</span><span><b>스크롤</b> 확대·축소</span></div>
+  <div class="park-keys"><span><b>W A S D</b><b>← ↑ ↓ →</b> 이동</span><span><b>SPACE</b> 점프</span><span><b>F</b> 벤치 앉기</span><span><b>E</b> 인사</span><span><b>Q</b> 부비부비</span><span><b>스크롤</b> 확대·축소</span></div>
   <div id="joy"><i></i></div>
   <button id="jumpBtn">JUMP</button>
   <div class="zoom"><button id="zoomIn" aria-label="확대">+</button><button id="zoomOut" aria-label="축소">−</button></div>
@@ -534,7 +536,8 @@ const TUNE = {
   sliderDamping: 15,   // 출렁임을 잡는 힘 (작을수록 더 출렁, 클수록 덜 출렁)
   releaseJelly : 0.6,  // 슬라이더에서 손 뗄 때 몸이 말랑하게 튕기는 세기 (0 = 없음)
   clickJelly   : 1.0,  // 클릭·도형·색·단계 바꿀 때 튕기는 세기 배수 (0 = 없음)
-  bodyJelly    : 1.5,  // 몸통이 따로 출렁이는 세기 (0 = 없음, 1.5 = 더 말랑)
+  bodyJelly    : 1.5,  // PARK에서 몸통이 따로 출렁이는 세기 (0 = 없음, 1.5 = 더 말랑)
+  createBodyJelly: 0,  // CREATE·ARCHIVE·홈에서 몸통 출렁임 (0 = 없음, 예전 그대로)
   rim          : 0.55, // 몸 가장자리 맑은 빛 (생기). 0 = 없음, 0.8 = 더 맑게
   publicURL    : 'https://pino774093.github.io/tong/',  // QR에 담기는 사이트 주소 (폰에서 열릴 주소)
   // 온라인 아카이브 (Supabase) — 공개용 publishable 키만 넣을 것
@@ -879,7 +882,7 @@ class Creature{
     const fp = this.hlPart==='face'?hp:0, lp=this.hlPart==='limbs'?hp:0, bp=this.hlPart==='body'?hp:0;
     this.face.scale.setScalar(this._fs*(1+fp));
     this.pivots.forEach((pv,j)=>pv.scale.setScalar(this._ps[j]*(1+lp)));
-    const bj=this.bx*(typeof TUNE!=='undefined'&&TUNE.bodyJelly!=null?TUNE.bodyJelly:1), idle=Math.sin(this.time*3.3)*0.012;
+    const bjK=this.bodyJelly!=null?this.bodyJelly:(typeof TUNE!=='undefined'&&TUNE.createBodyJelly!=null?TUNE.createBodyJelly:0), bj=this.bx*bjK, idle=bjK>0?Math.sin(this.time*3.3)*0.012*Math.min(1,bjK):0;
     this.body.scale.x=(1+bp)*(1-bj*0.55-idle*0.5); this.body.scale.y=(1+bp)*(1+bj*1.2+idle); this.body.scale.z=this._bz*(1-bj*0.55-idle*0.5);
     this.root.rotation.z=lerp(this.root.rotation.z,o.root,k);
     this.bend=lerp(this.bend,o.bend,k);
@@ -1101,7 +1104,7 @@ function showPage(p, jumpTo){
     $$('.nav [data-page]').forEach(a=>a.classList.toggle('on',a.dataset.page===p));  // pet page: none on
     $('#foot').hidden = p==='system' || p==='pet' || p==='park';
     document.body.classList.toggle('inpark', p==='park');
-    if (p==='park') enterPark();
+    if (p==='park') enterPark(); else netLeave();
     scrollTo(0,0);
     requestAnimationFrame(()=>{ fitAll(); if (p==='create' && typeof goStep==='function' && pet.stage===5 && curTab==='shape') {} });
   }
@@ -1748,7 +1751,7 @@ function standUp(o) {
 }
 function legCount(p) { return rule(p.shape).clones - 1; }
 function makeActor(a, isPlayer) {
-  const c = spawnFrom(a); c.shadow.visible = false; c.root.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = m.material !== EYE_MAT; m.material = parkMat(m.material); } }); c.calm = 0;
+  const c = spawnFrom(a); c.shadow.visible = false; c.root.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = m.material !== EYE_MAT; m.material = parkMat(m.material); } }); c.calm = 0; c.bodyJelly = TUNE.bodyJelly;
   const wrap = new THREE.Group(); wrap.add(c.holder); wrap.scale.setScalar(PARK.scale); parkWorld.add(wrap);
   c.mover.rotation.set(0, 0, 0);
   const legs = legCount(a.p);
@@ -1773,7 +1776,7 @@ function parkSignature() { return JSON.stringify([archive.map(a => a.no + a.name
 function enterPark() {
   if (!parkBuilt) { buildIsland(); parkWorld.traverse(o => { if (o.isMesh) o.castShadow = false; }); buildColorPanel(); parkBuilt = true; }   // only creatures cast real shadows
   const sig = parkSignature(); if (sig === parkSig && actors.length) return; parkSig = sig;
-  actors.forEach(o => { parkWorld.remove(o.wrap); o.c.clear(); o.tag.remove(); }); actors = [];
+  actors.forEach(o => { parkWorld.remove(o.wrap); o.c.clear(); o.tag.remove(); }); actors = []; NET.rem.forEach(r => r.actor = null);
   // player = the creature on the CREATE screen right now
   player = makeActor({ name: $('#petName').value.trim() || 'YOU', p: { ...state }, stand: pet.stand, mood: 'basic', ry: 0, rx: 0 }, true);
   player.x = 0; player.z = 4.2; player.heading = Math.PI; portalArmed = false; actors.push(player);
@@ -1785,9 +1788,77 @@ function enterPark() {
   const others = online.filter(a => !seen.has(a.no + a.name)).sort(() => Math.random() - 0.5);   // creatures made by everyone
   const list = mine.concat(friends, others).slice(0, PARK.maxNPC);
   list.forEach(a => { const n = makeActor({ ...a, p: { ...a.p }, stand: a.stand !== false }, false); const [x, z] = freeSpot(n.rad); n.x = x; n.z = z; actors.push(n); });
-  $('#parkCount').textContent = `${actors.length - 1} CREATURES`;
+  netCount(); if (NET.ready) { netSync(); netTrack(); } else netJoin();
   parkCam.position.set(player.x, parkDist * 0.78, player.z + parkDist * 0.62); parkCam.lookAt(player.x, 0, player.z - parkDist * 0.18);
 }
+
+
+/* ---- live multiplayer: everyone in PARK shares one island (Supabase Realtime) ---- */
+const NET = { sb: null, ch: null, ready: false, id: Math.random().toString(36).slice(2, 10), rem: new Map(), pres: {}, lastSend: 0, lastKey: '' };
+function netMe() { return { name: player ? player.name : 'YOU', p: { ...state }, stand: pet.stand, mood: 'basic', ry: 0, rx: 0 }; }
+async function netJoin() {
+  if (NET.ch || !TUNE.sbURL) return;
+  try {
+    if (!NET.sb) { const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      NET.sb = createClient(TUNE.sbURL, TUNE.sbKey, { auth: { persistSession: false }, realtime: { params: { eventsPerSecond: 20 } } }); }
+    if (NET.ch || curPage !== 'park') return;
+    const ch = NET.sb.channel('tong-park', { config: { presence: { key: NET.id }, broadcast: { self: false } } }); NET.ch = ch;
+    ch.on('presence', { event: 'sync' }, () => { NET.pres = ch.presenceState(); netSync(); })
+      .on('broadcast', { event: 'mv' }, ({ payload }) => netMove(payload))
+      .on('broadcast', { event: 'fx' }, ({ payload }) => netFx(payload))
+      .subscribe(s => { if (s === 'SUBSCRIBED') { NET.ready = true; netTrack(); } });
+  } catch (e) { console.warn('park live', e); NET.ch = null; }
+}
+function netTrack() { if (NET.ready && NET.ch && player) NET.ch.track({ code: packPet(netMe()), x: +player.x.toFixed(2), z: +player.z.toFixed(2) }).catch(() => {}); }
+function netLeave() {
+  if (NET.ch) { try { NET.ch.untrack(); NET.sb.removeChannel(NET.ch); } catch {} }
+  NET.ch = null; NET.ready = false; NET.pres = {};
+  NET.rem.forEach(r => netDrop(r)); NET.rem.clear(); netCount();
+}
+function netDrop(r) { const o = r.actor; if (!o) return; parkWorld.remove(o.wrap); o.c.clear(); o.tag.remove(); actors = actors.filter(x => x !== o); r.actor = null; }
+function netSync() {
+  const live = new Set();
+  for (const key in NET.pres) {
+    if (key === NET.id) continue; const meta = NET.pres[key][0]; if (!meta || typeof meta.code !== 'string') continue; live.add(key);
+    let r = NET.rem.get(key); if (!r) { r = { actor: null, code: '' }; NET.rem.set(key, r); }
+    if (r.actor && r.code === meta.code && actors.includes(r.actor)) continue;
+    const a = sanePet(unpackPet(meta.code)); if (!a) continue;
+    const keep = r.actor && actors.includes(r.actor) ? { x: r.actor.x, z: r.actor.z, h: r.actor.heading, net: r.actor.net } : null;
+    netDrop(r); r.code = meta.code;
+    const o = makeActor(a, false); o.remote = key; o.tag.classList.add('net');
+    if (keep) { o.x = keep.x; o.z = keep.z; o.heading = keep.h; o.net = keep.net; }
+    else { o.x = clamp(+meta.x || 0, -PARK.R, PARK.R); o.z = clamp(+meta.z || 0, -PARK.R, PARK.R); o.c.hop(); }
+    r.actor = o; actors.push(o);
+  }
+  for (const [key, r] of NET.rem) if (!live.has(key)) { netDrop(r); NET.rem.delete(key); }
+  netCount();
+}
+function netCount() {
+  const n = [...NET.rem.values()].filter(r => r.actor).length, npc = actors.filter(o => !o.isPlayer && !o.remote).length;
+  $('#parkCount').textContent = `${npc} CREATURES` + (n ? ` · ${n + 1} ONLINE` : '');
+}
+function netMove(m) {
+  const r = m && NET.rem.get(m.id); if (!r || !r.actor) return;
+  r.actor.net = { x: clamp(+m.x || 0, -PARK.R, PARK.R), z: clamp(+m.z || 0, -PARK.R, PARK.R), h: +m.h || 0, s: !!m.s };
+}
+function netFx(m) {
+  const r = m && NET.rem.get(m.id), o = r && r.actor; if (!o) return;
+  o.c.hop(); o.c.poke(0.8);
+  if (m.e === 'hi') emit('!', '#FF7A59', o.x, headY(o) + 0.4, o.z);
+  if (m.e === 'hug') emit('♪', '#7A5CFF', o.x, headY(o) + 0.3, o.z, 2);
+  if (m.to === NET.id && player) setTimeout(() => { player.c.hop(); player.c.poke(0.7); }, 250);   // they waved at me
+}
+function netSend(e, to) { if (NET.ready) NET.ch.send({ type: 'broadcast', event: 'fx', payload: { id: NET.id, e, to } }).catch(() => {}); }
+function netTick(t) {
+  if (!NET.ready || !player) return;
+  const key = `${player.x.toFixed(1)},${player.z.toFixed(1)},${player.heading.toFixed(1)},${player.sit ? 1 : 0}`;
+  const moving = key !== NET.lastKey;
+  if ((moving && t - NET.lastSend > 0.2) || t - NET.lastSend > 4) {   // ~5 updates/s while moving, a heartbeat otherwise
+    NET.lastSend = t; NET.lastKey = key;
+    NET.ch.send({ type: 'broadcast', event: 'mv', payload: { id: NET.id, x: +player.x.toFixed(2), z: +player.z.toFixed(2), h: +player.heading.toFixed(2), s: player.sit ? 1 : 0 } }).catch(() => {});
+  }
+}
+function nearestRemote() { let best = null, bd = 3.2; for (const o of actors) if (o.remote) { const d = Math.hypot(o.x - player.x, o.z - player.z); if (d < bd) { bd = d; best = o; } } return best; }
 
 // ---- input: keyboard + touch joystick + tap to move ----
 const keys = {};
@@ -1811,7 +1882,7 @@ function playerSit() {
   const bn = nearBench(player); if (bn) sitDown(player, bn);
 }
 function playerJump() {
-  player.c.hop(); player.c.poke(0.8);
+  player.c.hop(); player.c.poke(0.8); netSend('jump');
   actors.forEach(o => { if (o !== player && Math.hypot(o.x - player.x, o.z - player.z) < 4.5) setTimeout(() => { o.c.hop(); o.c.poke(0.6); }, 180 + Math.random() * 250); });
 }
 const joy = { on: false, id: null, cx: 0, cy: 0, dx: 0, dy: 0 };
@@ -1915,7 +1986,7 @@ function interTick(o, dt, t) {
 let socialClock = 0;
 function socialTick(dt) {
   socialClock -= dt; if (socialClock > 0) return; socialClock = 0.5;
-  const free = actors.filter(o => !o.isPlayer && !o.inter && !o.sit && o.state !== 'toBench' && (o.socialCD || 0) <= 0 && o.state !== 'flee');
+  const free = actors.filter(o => !o.isPlayer && !o.remote && !o.inter && !o.sit && o.state !== 'toBench' && (o.socialCD || 0) <= 0 && o.state !== 'flee');
   for (let i = 0; i < free.length; i++) for (let j = i + 1; j < free.length; j++) {
     const a = free[i], b = free[j]; if (a.inter || b.inter) continue;
     if (Math.hypot(a.x - b.x, a.z - b.z) > 4.2 || Math.random() > 0.35) continue;
@@ -1935,12 +2006,17 @@ function socialTick(dt) {
 // the player's own moves with the nearest friend
 function nearestFriend() {
   let best = null, bd = 3.2;
-  for (const o of actors) if (!o.isPlayer && !o.inter && !o.sit) { const d = Math.hypot(o.x - player.x, o.z - player.z); if (d < bd) { bd = d; best = o; } }
+  for (const o of actors) if (!o.isPlayer && !o.remote && !o.inter && !o.sit) { const d = Math.hypot(o.x - player.x, o.z - player.z); if (d < bd) { bd = d; best = o; } }
   return best;
 }
 function playerSocial(type) {
   if (!player || player.inter || player.sit) return;
-  const f = nearestFriend(); if (!f) return;
+  const f = nearestFriend();
+  if (!f) { const rp = nearestRemote(); if (!rp) return;
+    player.heading = Math.atan2(rp.x - player.x, rp.z - player.z); player.c.hop(); player.c.poke(0.8);
+    if (type === 'greet') emit('!', '#FF7A59', player.x, headY(player) + 0.4, player.z); else emit('♪', '#7A5CFF', (player.x + rp.x) / 2, headY(player) + 0.3, (player.z + rp.z) / 2, 2);
+    netSend(type === 'greet' ? 'hi' : 'hug', rp.remote); return; }
+  netSend(type === 'greet' ? 'hi' : 'hug');
   if (startInter(player, f, type)) { player.inter.locked = true; if (f.a.mood === 'shy' && type === 'cuddle') { f.c.poke(0.8); } }
 }
 $('#hiBtn').addEventListener('click', () => playerSocial('greet'));
@@ -2018,11 +2094,14 @@ function collide(o) {
 function parkUpdate(dt, t) {
   if (!player) return;
   playerControl(dt);
-  for (const o of actors) if (!o.isPlayer) npcThink(o, dt);
+  for (const o of actors) if (!o.isPlayer && !o.remote) npcThink(o, dt);
   socialTick(dt);
   for (const o of actors) if (o.inter) interTick(o, dt, t);
   fxTick(dt);
   for (const o of actors) {
+    if (o.remote && o.net) { const n = o.net, dx = n.x - o.x, dz = n.z - o.z;
+      if (Math.hypot(dx, dz) > 5) { o.x = n.x; o.z = n.z; o.vx = o.vz = 0; } else { o.vx = dx * 6; o.vz = dz * 6; }
+      const dh = ((n.h - o.heading + Math.PI * 3) % (Math.PI * 2)) - Math.PI; o.heading += dh * (1 - Math.exp(-dt * 10)); }
     { const ax = (o.vx - (o.pvx || 0)) / Math.max(dt, 1e-3), az = (o.vz - (o.pvz || 0)) / Math.max(dt, 1e-3), acc = Math.hypot(ax, az);
       if (acc > 4) o.c.poke(Math.min(0.5, acc * 0.012) * dt * 20); o.pvx = o.vx; o.pvz = o.vz; }
     o.x += o.vx * dt; o.z += o.vz * dt; o.bumpCD -= dt;
@@ -2030,24 +2109,27 @@ function parkUpdate(dt, t) {
     const moving = Math.hypot(o.vx, o.vz) > 0.35;
     if (moving && o.legs <= 2) { o.hopT -= dt; if (o.hopT <= 0) { o.c.hopH = 0.18; o.c.hop(); o.hopT = 0.55; } }
     else if (moving) { o.hopT -= dt; if (o.hopT <= 0) { o.c.poke(0.22); o.hopT = 0.32; } }   // little jiggle on every step
-    o.c.moodKey = o.sit ? 'lazy' : o.inter && o.inter.type === 'greet' && o.inter.phase === 'do' ? 'happy' : moving && o.legs > 2 ? 'walk' : (o.isPlayer ? 'basic' : (o.a.mood || 'basic'));
+    o.c.moodKey = (o.sit || (o.remote && o.net && o.net.s)) ? 'lazy' : o.inter && o.inter.type === 'greet' && o.inter.phase === 'do' ? 'happy' : moving && o.legs > 2 ? 'walk' : (o.isPlayer ? 'basic' : (o.a.mood || 'basic'));
   }
   // creature-creature bumps
   for (let i = 0; i < actors.length; i++) for (let j = i + 1; j < actors.length; j++) {
     const a = actors[i], b = actors[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = a.rad + b.rad;
-    if (a.sit || b.sit) continue;
-    if (d < m && d > 1e-4) { const push = (m - d) / 2, nx = dx / d, nz = dz / d; a.x -= nx * push; a.z -= nz * push; b.x += nx * push; b.z += nz * push;
+    if (a.sit || b.sit || (a.remote && b.remote) || (a.remote && a.net && a.net.s) || (b.remote && b.net && b.net.s)) continue;
+    if (d < m && d > 1e-4) { const push = (m - d) / 2, nx = dx / d, nz = dz / d, wa = a.remote ? 0 : b.remote ? 2 : 1, wb = b.remote ? 0 : a.remote ? 2 : 1;
+      a.x -= nx * push * wa; a.z -= nz * push * wa; b.x += nx * push * wb; b.z += nz * push * wb;
       if (a.bumpCD <= 0 && b.bumpCD <= 0 && Math.hypot(a.vx - b.vx, a.vz - b.vz) > 0.8) { a.c.poke(0.9); b.c.poke(0.9); a.bumpCD = b.bumpCD = 0.6; } }
   }
   for (const o of actors) {
     if (o.sit) { const [sx, sz] = seatPos(o.sit.bn, o.sit.spot), k = 1 - Math.exp(-dt * 8);
       o.x = lerp(o.x, sx, k); o.z = lerp(o.z, sz, k); o.heading = lerp(o.heading, o.sit.bn.ry, k); o.vx = o.vz = 0; o.y = lerp(o.y || 0, 0.62, k); }
+    else if (o.remote) { o.y = lerp(o.y || 0, o.net && o.net.s ? 0.62 : 0, 1 - Math.exp(-dt * 8)); }
     else { collide(o); o.y = lerp(o.y || 0, 0, 1 - Math.exp(-dt * 10)); }
     o.c.update(dt);
     o.wrap.position.set(o.x + (o.offX || 0), o.y || 0, o.z + (o.offZ || 0));
     o.wrap.rotation.y = o.heading;
   }
   animateIsland(dt, t);
+  netTick(t);
   parkDist = lerp(parkDist, parkZoom, 1 - Math.exp(-dt * 6));
   // camera: miniature view from above, player at lower centre
   const target = new THREE.Vector3(player.x, 0, player.z - parkDist * 0.18);
@@ -2074,7 +2156,7 @@ function parkUpdate(dt, t) {
   // name tags: player + creatures near the player
   const v = new THREE.Vector3();
   for (const o of actors) {
-    const near = o.isPlayer || Math.hypot(o.x - player.x, o.z - player.z) < 4.5;
+    const near = o.isPlayer || o.remote || Math.hypot(o.x - player.x, o.z - player.z) < 4.5;
     o.tag.classList.toggle('on', near);
     if (!near) continue;
     o.wrap.localToWorld(v.set(0, o.c.size.y * 1.15, 0)); v.project(parkCam);
