@@ -292,7 +292,12 @@ body.pwarp::after{opacity:1;transition:opacity .55s ease-in}
 .sm-box p{font-family:var(--kr);font-size:14px;margin:10px 0}
 @media (max-width:900px){ #petPage{grid-template-columns:1fr;padding:56px 5vw 5vh;align-content:start} #petStage{height:46svh} .pet-name{font-size:clamp(46px,13vw,90px)} .pet-meta{font-size:13.5px;margin:6px 0 16px} .pet-acts{max-width:none} .pet-acts .btn{padding:13px} .arc-grid{grid-template-columns:repeat(2,1fr)!important} #archivePage{padding-top:70px} }
 #archivePage{padding:calc(3vw + 50px) 4.4vw 12vh;min-height:100vh}
-#archivePage .arc-grid{margin-top:3vw}
+#archivePage .arc-grid{margin-top:1.4vw}
+.arc-tabs{display:flex;gap:6px;margin-top:2.4vw}
+.arc-tabs button{font-family:var(--cond);font-weight:800;font-size:clamp(15px,1.25vw,20px);letter-spacing:.04em;padding:8px 16px;background:transparent;color:var(--white);border:1px solid rgba(255,255,255,.7);cursor:pointer;transition:background .2s,color .2s}
+.arc-tabs button i{font-style:normal;opacity:.6;margin-left:4px}
+.arc-tabs button.on{background:var(--white);color:var(--ink)}
+.am-free[hidden]{display:none!important}
 .page{animation:pagein .7s cubic-bezier(.2,.8,.2,1)}
 @keyframes pagein{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 #adopt{padding-top:3vw}
@@ -473,6 +478,7 @@ footer img{height:clamp(30px,3vw,48px)}
 <div class="page" data-page="archive" hidden>
 <section id="archivePage" class="z2">
   <div class="giant" style="font-size:clamp(90px,13vw,220px)">ARCHIVE</div>
+  <div class="arc-tabs" id="arcTabs"><button data-t="mine" class="on">MINE <i id="nMine">0</i></button><button data-t="all">EVERYONE <i id="nAll">—</i></button></div>
   <div class="arc-grid" id="arcGrid"></div>
 </section>
 </div>
@@ -531,6 +537,9 @@ const TUNE = {
   bodyJelly    : 1.5,  // 몸통이 따로 출렁이는 세기 (0 = 없음, 1.5 = 더 말랑)
   rim          : 0.55, // 몸 가장자리 맑은 빛 (생기). 0 = 없음, 0.8 = 더 맑게
   publicURL    : 'https://pino774093.github.io/tong/',  // QR에 담기는 사이트 주소 (폰에서 열릴 주소)
+  // 온라인 아카이브 (Supabase) — 공개용 publishable 키만 넣을 것
+  sbURL : 'https://amhrxwkfsuczegsigycy.supabase.co',
+  sbKey : 'sb_publishable_CIGJY0hPnmCo-hBzNeeQcQ_53cmn5PC',
 };
 
 /* Minimal QR Code generator (byte mode, ECC L/M), after Nayuki's reference design. */
@@ -1082,6 +1091,7 @@ addEventListener('wheel',e=>{
 const PAGES=['system','create','archive','park'];
 let curPage=null;
 function showPage(p, jumpTo){
+  if (p==='archive' || p==='park') SB.list();
   if (p && p.startsWith('pet-')){ const a=unpackPet(p.slice(4)); if (a){ openPet(a); p='pet'; } else p='system'; }
   if (p!=='pet' && !PAGES.includes(p)) p='system';
   if (p!==curPage){
@@ -1311,7 +1321,50 @@ $('#dice').addEventListener('click',()=>{ $('#petName').value=NAMES[Math.floor(M
 ['#petName','#ownerName'].forEach(s=>$(s).addEventListener('input',()=>{ unstamp(); updateCert(); }));
 const store={ get(){ try{ return JSON.parse(localStorage.getItem('tong-archive')||'[]'); }catch{ return []; } }, set(v){ try{ localStorage.setItem('tong-archive',JSON.stringify(v)); }catch{} } };
 let archive=store.get();
-let arcCur=-1, am=null;
+let arcCur=-1, am=null, arcTab='mine', online=[];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const arcList=()=> arcTab==='all' ? online : archive;
+/* ---- online archive (Supabase REST) ---- */
+const SB={
+  h:()=>({apikey:TUNE.sbKey,'Content-Type':'application/json'}),
+  last:-1e9, busy:false,
+  async list(force){
+    if (!TUNE.sbURL || this.busy || (!force && performance.now()-this.last<20000)) return;
+    this.busy=true;
+    try{
+      const r=await fetch(TUNE.sbURL+'/rest/v1/creatures?select=id,name,data,created_at&order=created_at.desc&limit=40',{headers:this.h()});
+      if (!r.ok) throw new Error(r.status);
+      const rows=await r.json();
+      online=rows.map(row=>{ const a=row.data&&typeof row.data.code==='string'?sanePet(unpackPet(row.data.code)):null; if(!a) return null;
+        const R=rule(a.p.shape); return {...a, sid:row.id, clones:R.clones, eyes:R.eyes, size:(row.data.size|0)||null, shape:a.p.shape}; }).filter(Boolean);
+      this.last=performance.now(); $('#nAll').textContent=online.length;
+      if (arcTab==='all') renderArchive();
+    }catch(e){ console.warn('online archive',e); $('#nAll').textContent='—'; }
+    this.busy=false;
+  },
+  async add(a){
+    if (!TUNE.sbURL) return null;
+    try{
+      const r=await fetch(TUNE.sbURL+'/rest/v1/creatures',{method:'POST',headers:{...this.h(),Prefer:'return=representation'},
+        body:JSON.stringify({name:String(a.name).slice(0,20), data:{code:packPet(a), size:a.size||null}})});
+      if (!r.ok) throw new Error(r.status+' '+await r.text());
+      const [row]=await r.json(); this.list(true); return row&&row.id;
+    }catch(e){ console.warn('online add',e); return null; }
+  }
+};
+// creatures coming from other people: keep every number inside the slider ranges
+function sanePet(a){
+  if (!a || !a.p || !SHAPES[a.p.shape]) return null;
+  for (const k of PKEYS){ const c=C[k], v=+a.p[k]; if (!Number.isFinite(v)) return null; a.p[k]=c?clamp(v,c[2],c[3]):clamp(v,0,1); }
+  if (!PALETTES[a.p.palette] && a.p.palette!=='solid') a.p.palette='tong';
+  const hex=/^#[0-9a-f]{6}$/i; if (!hex.test(a.p.body)) a.p.body='#F5B23C'; if (!hex.test(a.p.face)) a.p.face=a.p.body;
+  a.p.seed=(+a.p.seed|0)%100000; if (!MOODS[a.mood]) a.mood='basic';
+  a.ry=clamp(+a.ry||-0.55,-3.2,3.2); a.rx=clamp(+a.rx||0.3,-0.3,0.7);
+  a.name=String(a.name||'?').slice(0,20); a.owner=String(a.owner||'').slice(0,20); a.date=String(a.date||'').slice(0,12); a.no=String(a.no||'').slice(0,16);
+  return a;
+}
+$('#arcTabs').addEventListener('click',e=>{ const b=e.target.closest('button[data-t]'); if(!b) return; arcTab=b.dataset.t;
+  $$('#arcTabs button').forEach(x=>x.classList.toggle('on',x===b)); renderArchive(); if (arcTab==='all') SB.list(true); });
 function openArcLive(a){
   const cv=$('#amCanvas');
   if (!am){ const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}); r.setPixelRatio(Math.min(devicePixelRatio||1,2)); am={r,scene:setupScene(r),cam:new THREE.PerspectiveCamera(26,1,0.1,100),c:null}; }
@@ -1323,9 +1376,9 @@ function openArcLive(a){
   am.cam.position.set(0,s.y*0.5,d); am.cam.lookAt(0,s.y*0.5,0);
 }
 function openArc(i){
-  const a=archive[i]; if(!a) return;
+  const a=arcList()[i]; if(!a) return;
   $('#amImg').src=a.img||''; requestAnimationFrame(()=>openArcLive(a)); $('#amNo').textContent=(a.no||'EXT')+' · '+(a.date||'');
-  $('#amName').textContent=a.name;
+  $('#amName').textContent=a.name; $('#amFree').hidden = arcTab==='all';
   const p=a.p||{}, f=v=>v==null?'—':(+v).toFixed(2);
   const rows=[
     ['SHAPE','',a.shape?SH_EN[a.shape]:'—'],
@@ -1342,7 +1395,7 @@ function openArc(i){
 }
 $('#arcGrid').addEventListener('click',e=>{ const c=e.target.closest('.arc[data-i]'); if(c) openArc(+c.dataset.i); });
 $('#amFree').addEventListener('click',()=>{
-  const fb=$('#amFree'), a=archive[arcCur]; if(!a) return;
+  const fb=$('#amFree'), a=archive[arcCur]; if(!a || arcTab!=='mine') return;
   if (!fb.classList.contains('ask')){ fb.classList.add('ask'); fb.querySelector('span').textContent='한 번 더 누르면 풀어줘요'; return; }
   $('#arcModal').classList.add('freeing');
   setTimeout(()=>{
@@ -1362,10 +1415,11 @@ function spawnFrom(a){
 }
 function renderArchive(){
   arcLive.forEach(o=>{ scene.remove(o.wrap); o.c.clear(); }); arcLive.length=0;
-  const items=archive.map((a,i)=> a.p ? `<div class="arc" data-i="${i}"><span>${a.name}</span></div>` : `<div class="arc" data-i="${i}"><img src="${a.img}" alt=""><span>${a.name}</span></div>`);
+  const L=arcList(); $('#nMine').textContent=archive.length;
+  const items=L.map((a,i)=> a.p ? `<div class="arc" data-i="${i}"><span>${esc(a.name)}</span></div>` : `<div class="arc" data-i="${i}"><img src="${esc(a.img)}" alt=""><span>${esc(a.name)}</span></div>`);
   while (items.length<6) items.push('<div class="arc empty">—</div>');
   $('#arcGrid').innerHTML=items.join('');
-  archive.forEach((a,i)=>{ if(!a.p) return; const c=spawnFrom(a); const wrap=new THREE.Group(); wrap.add(c.holder); wrap.visible=false; scene.add(wrap);
+  L.forEach((a,i)=>{ if(!a.p) return; const c=spawnFrom(a); const wrap=new THREE.Group(); wrap.add(c.holder); wrap.visible=false; scene.add(wrap);
     arcLive.push({cell:$(`#arcGrid .arc[data-i="${i}"]`), c, wrap, a, ph:i*1.7}); });
 }
 function thumb(src){ return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=c.height=240; c.getContext('2d').drawImage(im,0,0,240,240); res(c.toDataURL('image/png')); }; im.src=src; }); }
@@ -1380,6 +1434,7 @@ $('#adoptForm').addEventListener('submit',async e=>{
   archive.unshift({name, img:await thumb($('#certImg').src), owner:$('#ownerName').value.trim(), date:today(), no:$('#certNo').textContent, shape:state.shape, clones:R0.clones, eyes:R0.eyes, size:cm(), p:{...state}, stand:pet.stand, mood:pet.moodKey, ry:drag.ry, rx:drag.rx}); archive=archive.slice(0,24); store.set(archive); renderArchive();
   showQR(archive[0]);
   toast(`${name} — ADOPTED`);
+  const mineNow=archive[0]; SB.add(mineNow).then(id=>{ if(id){ mineNow.sid=id; store.set(archive); } });
 });
 
 /* ============ QR: carry a creature to a phone ============ */
@@ -1714,7 +1769,7 @@ function freeSpot(rad) {
   }
   return [0, 0];
 }
-function parkSignature() { return JSON.stringify([archive.map(a => a.no + a.name), state]); }
+function parkSignature() { return JSON.stringify([archive.map(a => a.no + a.name), online.length, state]); }
 function enterPark() {
   if (!parkBuilt) { buildIsland(); parkWorld.traverse(o => { if (o.isMesh) o.castShadow = false; }); buildColorPanel(); parkBuilt = true; }   // only creatures cast real shadows
   const sig = parkSignature(); if (sig === parkSig && actors.length) return; parkSig = sig;
@@ -1725,8 +1780,10 @@ function enterPark() {
   const friends = [
     { name: '통이', p: PRESETS.tong, mood: 'basic' }, { name: '꼬미', p: PRESETS.komi, mood: 'happy' },
     { name: '핑크', p: PRESETS.pink, mood: 'shy' }, { name: '주황', p: PRESETS.orange, mood: 'lazy' }, { name: '초록', p: PRESETS.green, mood: 'basic' }];
-  const mine = archive.filter(a => a.p).slice(0, PARK.maxNPC);
-  const list = mine.concat(friends).slice(0, PARK.maxNPC);
+  const mine = archive.filter(a => a.p).slice(0, 6);
+  const seen = new Set(mine.map(a => a.no + a.name));
+  const others = online.filter(a => !seen.has(a.no + a.name)).sort(() => Math.random() - 0.5);   // creatures made by everyone
+  const list = mine.concat(friends, others).slice(0, PARK.maxNPC);
   list.forEach(a => { const n = makeActor({ ...a, p: { ...a.p }, stand: a.stand !== false }, false); const [x, z] = freeSpot(n.rad); n.x = x; n.z = z; actors.push(n); });
   $('#parkCount').textContent = `${actors.length - 1} CREATURES`;
   parkCam.position.set(player.x, parkDist * 0.78, player.z + parkDist * 0.62); parkCam.lookAt(player.x, 0, player.z - parkDist * 0.18);
