@@ -1984,7 +1984,7 @@ let tapTarget = null;
 const ray = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const camDrag = { on: false, id: null, x: 0, y: 0, moved: 0 };
 $('#parkPage').addEventListener('pointerdown', e => {
-  if (e.target.closest('button,a,#joy,.pcol,.zoom,.social,input,textarea') || camDrag.on) return;
+  if (e.target.closest('button,a,#joy,.pcol,.zoom,.social,input,textarea') || camDrag.on || pinch.pts.size >= 1) return;
   Object.assign(camDrag, { on: true, id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 });
 });
 addEventListener('pointermove', e => {
@@ -1997,6 +1997,21 @@ addEventListener('pointermove', e => {
 });
 const camDragEnd = e => { if (!camDrag.on || (e && e.pointerId !== camDrag.id)) return; camDrag.on = false; document.body.classList.remove('camdrag'); setTimeout(() => camDrag.moved = 0, 0); };
 addEventListener('pointerup', camDragEnd); addEventListener('pointercancel', camDragEnd);
+// two fingers: pinch to zoom (phones)
+const pinch = { pts: new Map(), d0: 0, z0: 0 };
+$('#parkPage').addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' || e.target.closest('button,a,#joy,.pcol,.zoom,.social,input,textarea')) return;
+  pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinch.pts.size === 2) { const [a, b] = [...pinch.pts.values()]; pinch.d0 = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; pinch.z0 = parkZoom;
+    camDrag.on = false; camDrag.moved = 99; document.body.classList.remove('camdrag'); }   // not a drag, not a tap
+});
+addEventListener('pointermove', e => {
+  if (!pinch.pts.has(e.pointerId)) return; pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinch.pts.size === 2) { const [a, b] = [...pinch.pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
+    parkZoom = clamp(pinch.z0 * pinch.d0 / d, ZOOM_MIN, ZOOM_MAX); }   // spread fingers = closer
+});
+const pinchEnd = e => { if (pinch.pts.delete(e.pointerId) && pinch.pts.size < 2) setTimeout(() => { if (!camDrag.on) camDrag.moved = 0; }, 60); };
+addEventListener('pointerup', pinchEnd); addEventListener('pointercancel', pinchEnd);
 $('#parkPage').addEventListener('dblclick', e => { if (!e.target.closest('button,a,#joy,.pcol')) { camYawT = 0; camPitchT = 0; } });   // double-click: back to the default view
 $('#parkPage').addEventListener('click', e => {
   if (e.target.closest('button,a,#joy,.pcol')) return;
